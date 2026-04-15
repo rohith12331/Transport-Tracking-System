@@ -20,9 +20,10 @@ export default function CreateBusDialog() {
   const [routes, setRoutes] = useState<Route[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [form, setForm] = useState({
-    number: "", registrationNumber: "", capacity: "40",
-    currentRouteId: "", driverId: "", status: "active",
+    name: "", number: "", registrationNumber: "", capacity: "40", busType: "Non-AC",
+    currentRouteId: "", driverId: "", manualDriverName: "", status: "active",
   });
+  const [driverMode, setDriverMode] = useState<"select" | "manual">("select");
 
   useEffect(() => {
     if (!open) return;
@@ -44,13 +45,20 @@ export default function CreateBusDialog() {
     setLoading(true);
     try {
       const payload: Record<string, unknown> = {
+        name: form.name,
         number: form.number,
         capacity: parseInt(form.capacity) || 40,
+        busType: form.busType,
         status: form.status,
       };
       if (form.registrationNumber) payload.registrationNumber = form.registrationNumber;
-      if (form.currentRouteId) payload.currentRouteId = form.currentRouteId;
-      if (form.driverId) payload.driverId = form.driverId;
+      if (form.currentRouteId && form.currentRouteId !== "none") payload.currentRouteId = form.currentRouteId;
+      
+      if (driverMode === "select" && form.driverId && form.driverId !== "none") {
+        payload.driverId = form.driverId;
+      } else if (driverMode === "manual" && form.manualDriverName) {
+        payload.manualDriverName = form.manualDriverName;
+      }
 
       const res = await fetch("/api/buses", {
         method: "POST",
@@ -63,7 +71,7 @@ export default function CreateBusDialog() {
       }
       toast.success(`Bus ${form.number} created.`);
       setOpen(false);
-      setForm({ number: "", registrationNumber: "", capacity: "40", currentRouteId: "", driverId: "", status: "active" });
+      setForm({ name: "", number: "", registrationNumber: "", capacity: "40", busType: "Non-AC", currentRouteId: "", driverId: "", manualDriverName: "", status: "active" });
       router.refresh();
     } catch (err: any) {
       toast.error(err.message ?? "Failed to create bus.");
@@ -84,8 +92,27 @@ export default function CreateBusDialog() {
         <form onSubmit={handleSubmit} className="space-y-4 mt-2">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
+              <Label>Bus Name</Label>
+              <Input placeholder="e.g. Morning Star" value={form.name} onChange={(e) => set("name", e.target.value)} />
+            </div>
+            <div className="space-y-1">
               <Label>Bus Number *</Label>
               <Input placeholder="e.g. KA-01-F-1234" value={form.number} onChange={(e) => set("number", e.target.value)} required />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label>Bus Type</Label>
+              <Select value={form.busType} onValueChange={(v) => set("busType", v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Non-AC">Non-AC</SelectItem>
+                  <SelectItem value="AC">AC</SelectItem>
+                  <SelectItem value="Sleeper">Sleeper</SelectItem>
+                  <SelectItem value="Premium AC">Premium AC</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1">
               <Label>Capacity</Label>
@@ -94,44 +121,45 @@ export default function CreateBusDialog() {
           </div>
 
           <div className="space-y-1">
-            <Label>Registration Number</Label>
-            <Input placeholder="Optional" value={form.registrationNumber} onChange={(e) => set("registrationNumber", e.target.value)} />
-          </div>
-
-          <div className="space-y-1">
-            <Label>Assign Route</Label>
+            <Label>Assign Route (Optional)</Label>
             <Select value={form.currentRouteId} onValueChange={(v) => set("currentRouteId", v)}>
               <SelectTrigger>
-                <SelectValue placeholder="Select a route (optional)" />
+                <SelectValue placeholder="Select a route..." />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="none">No Route Assigned</SelectItem>
                 {routes.map((r) => (
                   <SelectItem key={r.id} value={r.id}>
                     Route {r.number} — {r.name}
                   </SelectItem>
                 ))}
-                {routes.length === 0 && (
-                  <SelectItem value="_none" disabled>No routes yet — create routes first</SelectItem>
-                )}
               </SelectContent>
             </Select>
           </div>
 
           <div className="space-y-1">
-            <Label>Assign Driver</Label>
-            <Select value={form.driverId} onValueChange={(v) => set("driverId", v)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a driver (optional)" />
-              </SelectTrigger>
-              <SelectContent>
-                {drivers.map((d) => (
-                  <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-                ))}
-                {drivers.length === 0 && (
-                  <SelectItem value="_none" disabled>No drivers registered yet</SelectItem>
-                )}
-              </SelectContent>
-            </Select>
+            <div className="flex items-center justify-between">
+              <Label>Assign Driver</Label>
+              <Button type="button" variant="link" size="sm" className="h-auto p-0 text-xs text-teal-400" onClick={() => setDriverMode(driverMode === "select" ? "manual" : "select")}>
+                {driverMode === "select" ? "+ Add custom name manually" : "Select existing account"}
+              </Button>
+            </div>
+            
+            {driverMode === "select" ? (
+              <Select value={form.driverId} onValueChange={(v) => set("driverId", v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a driver account..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No Driver Assigned</SelectItem>
+                  {drivers.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Input placeholder="Enter driver name manually (e.g. John Doe)" value={form.manualDriverName} onChange={(e) => set("manualDriverName", e.target.value)} />
+            )}
           </div>
 
           <div className="space-y-1">

@@ -8,7 +8,13 @@ export async function GET() {
   try {
     const allBuses = await db.query.buses.findMany({
       with: {
-        route: true,
+        route: {
+          with: {
+            routeStops: {
+              with: { stop: true }
+            }
+          }
+        },
         location: true,
         driver: { columns: { id: true, name: true } },
       },

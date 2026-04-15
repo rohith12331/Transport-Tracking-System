@@ -59,49 +59,76 @@ export async function simulateBus(busId: string): Promise<{ success: boolean; me
     return { success: false, message: "Route needs at least 2 stops" };
   }
 
-  const currentStopIndex = bus.location?.currentStopIndex ?? 0;
-  const nextStopIndex = Math.min(currentStopIndex + 1, stops.length - 1);
+  const location = bus.location;
+  const isReverse = location?.isReverse ?? false;
+  const currentStopIndex = location?.currentStopIndex ?? (isReverse ? stops.length - 1 : 0);
+  const lastUpdate = location?.updatedAt ? new Date(location.updatedAt).getTime() : 0;
+  const now = Date.now();
+  const WAIT_TIME_MS = 10 * 60 * 1000; // 10 Minutes
 
-  if (currentStopIndex >= stops.length - 1) {
-    // Bus completed route — reset to start
-    const startStop = stops[0].stop;
+  // Check if we are at a terminal stop and need to wait or flip direction
+  const isAtEnd = !isReverse && currentStopIndex >= stops.length - 1;
+  const isAtStart = isReverse && currentStopIndex <= 0;
+
+  if (isAtEnd || isAtStart) {
+    if (now - lastUpdate < WAIT_TIME_MS) {
+      const remainingMins = Math.ceil((WAIT_TIME_MS - (now - lastUpdate)) / 60000);
+      return { 
+        success: true, 
+        message: `Waiting at terminal (${isAtEnd ? "End" : "Start"}). Departing in ${remainingMins} mins.` 
+      };
+    }
+
+    // Wait is over — flip direction and reset index to begin return journey
+    const newIsReverse = !isReverse;
+    const newStopIndex = newIsReverse ? stops.length - 1 : 0;
+    const nextStopIndex = newIsReverse ? stops.length - 2 : 1;
+    
     await db
       .insert(busLocations)
       .values({
         id: nanoid(),
         busId,
-        latitude: startStop.latitude,
-        longitude: startStop.longitude,
+        latitude: stops[newStopIndex].stop.latitude,
+        longitude: stops[newStopIndex].stop.longitude,
         speed: 0,
         heading: 0,
-        currentStopIndex: 0,
-        nextStopId: stops[1]?.stopId ?? null,
+        currentStopIndex: newStopIndex,
+        nextStopId: stops[nextStopIndex].stopId,
+        isReverse: newIsReverse,
         updatedAt: new Date(),
       })
       .onConflictDoUpdate({
         target: busLocations.busId,
         set: {
-          latitude: startStop.latitude,
-          longitude: startStop.longitude,
+          currentStopIndex: newStopIndex,
+          nextStopId: stops[nextStopIndex].stopId,
+          isReverse: newIsReverse,
           speed: 0,
-          heading: 0,
-          currentStopIndex: 0,
-          nextStopId: stops[1]?.stopId ?? null,
           updatedAt: new Date(),
         },
       });
 
-    return { success: true, message: "Bus reset to start of route" };
+    return { success: true, message: `Starting return journey (${newIsReverse ? "Backward" : "Forward"})` };
   }
 
-  const currentStop = stops[currentStopIndex].stop;
+  // Calculate next stop based on direction
+  const nextStopIndex = isReverse ? currentStopIndex - 1 : currentStopIndex + 1;
   const nextStop = stops[nextStopIndex].stop;
 
   // Current position (or start from current stop if no location)
   const currentLat = bus.location?.latitude ?? currentStop.latitude;
   const currentLng = bus.location?.longitude ?? currentStop.longitude;
 
-  const speed = randomSpeed();
+  const previousSpeed = bus.location?.speed ?? 0;
+  const maxAllowedSpeed = 65 + Math.random() * 5; // Target range 65-70
+  // Slowly increase speed by 5-8 km/h per update until max is reached
+  let speed = previousSpeed < maxAllowedSpeed 
+    ? previousSpeed + (3 + Math.random() * 5) 
+    : maxAllowedSpeed - Math.random() * 3;
+  
+  // Ensure we don't exceed max too much and stay above 0
+  speed = Math.max(0, Math.min(speed, 72));
   const distToNext = haversineDistance(currentLat, currentLng, nextStop.latitude, nextStop.longitude);
   const timeToNextSeconds = (distToNext / speed) * 3600;
 
@@ -118,10 +145,15 @@ export async function simulateBus(busId: string): Promise<{ success: boolean; me
   const heading = calculateHeading(currentLat, currentLng, nextStop.latitude, nextStop.longitude);
   const arrivedAtStop = fraction >= 0.95;
   const newStopIndex = arrivedAtStop ? nextStopIndex : currentStopIndex;
-  const nextNextStopId =
-    arrivedAtStop && nextStopIndex + 1 < stops.length
-      ? stops[nextStopIndex + 1].stopId
-      : stops[nextStopIndex].stopId;
+  
+  // Predict next destination for the database
+  let nextNextStopId = location?.nextStopId;
+  if (arrivedAtStop) {
+    const eventualIndex = isReverse ? nextStopIndex - 1 : nextStopIndex + 1;
+    if (eventualIndex >= 0 && eventualIndex < stops.length) {
+      nextNextStopId = stops[eventualIndex].stopId;
+    }
+  }
 
   // Update database
   await db
@@ -135,6 +167,7 @@ export async function simulateBus(busId: string): Promise<{ success: boolean; me
       heading,
       currentStopIndex: newStopIndex,
       nextStopId: nextNextStopId,
+      isReverse,
       updatedAt: new Date(),
     })
     .onConflictDoUpdate({
@@ -146,6 +179,7 @@ export async function simulateBus(busId: string): Promise<{ success: boolean; me
         heading,
         currentStopIndex: newStopIndex,
         nextStopId: nextNextStopId,
+        isReverse,
         updatedAt: new Date(),
       },
     });
@@ -161,6 +195,7 @@ export async function simulateBus(busId: string): Promise<{ success: boolean; me
     speed: arrivedAtStop ? 0 : speed,
     heading,
     currentStopIndex: newStopIndex,
+    isReverse,
     timestamp: new Date().toISOString(),
   });
 

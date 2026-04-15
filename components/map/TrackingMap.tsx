@@ -41,6 +41,7 @@ interface TrackingMapProps {
   onBusClick?: (busId: string) => void;
   onStopClick?: (stopId: string) => void;
   selectedBusId?: string | null;
+  fitToRoute?: boolean;
 }
 
 // ─── Geometry helpers ────────────────────────────────────────────────────────
@@ -107,6 +108,7 @@ export default function TrackingMap({
   onBusClick,
   onStopClick,
   selectedBusId,
+  fitToRoute = false,
 }: TrackingMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
@@ -116,9 +118,9 @@ export default function TrackingMap({
   const routeGeomRef = useRef<Map<string, [number, number][]>>(new Map());
   const [mapLoaded, setMapLoaded] = useState(false);
 
-  const centerLng = center?.[0] ?? parseFloat(process.env.NEXT_PUBLIC_MAP_CENTER_LNG ?? "75.5762");
-  const centerLat = center?.[1] ?? parseFloat(process.env.NEXT_PUBLIC_MAP_CENTER_LAT ?? "31.3260");
-  const mapZoom = zoom ?? parseFloat(process.env.NEXT_PUBLIC_MAP_ZOOM ?? "13");
+  const centerLng = center?.[0] ?? parseFloat(process.env.NEXT_PUBLIC_MAP_CENTER_LNG ?? "80.6480");
+  const centerLat = center?.[1] ?? parseFloat(process.env.NEXT_PUBLIC_MAP_CENTER_LAT ?? "16.5062");
+  const mapZoom = zoom ?? parseFloat(process.env.NEXT_PUBLIC_MAP_ZOOM ?? "14");
 
   // ── Init map ───────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -126,7 +128,7 @@ export default function TrackingMap({
 
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
-      style: "mapbox://styles/mapbox/streets-v12",
+      style: "mapbox://styles/mapbox/dark-v11",
       center: [centerLng, centerLat],
       zoom: mapZoom,
     });
@@ -350,6 +352,14 @@ export default function TrackingMap({
 
     channel.bind(EVENTS.LOCATION_UPDATE, (data: BusLocation) => {
       updateBusMarker(data);
+      
+      // Auto-follow logic: If this is our selected bus, center map on it
+      if (data.busId === selectedBusId && map.current && !fitToRoute) {
+        map.current.easeTo({
+          center: [data.longitude, data.latitude],
+          duration: 1000
+        });
+      }
     });
 
     return () => {
@@ -359,6 +369,8 @@ export default function TrackingMap({
   }, [updateBusMarker]);
 
   // ── Highlight selected bus (scale the inner element) ──────────────────────
+
+  
   useEffect(() => {
     busMarkersRef.current.forEach((marker, busId) => {
       const inner = marker.getElement().querySelector<HTMLElement>(".bus-inner");
@@ -372,6 +384,37 @@ export default function TrackingMap({
       marker.getElement().style.zIndex = isSelected ? "10" : "1";
     });
   }, [selectedBusId]);
+
+  useEffect(() => {
+    if (!mapLoaded || !map.current) return;
+    
+    if (fitToRoute && routes.length > 0) {
+      const bounds = new mapboxgl.LngLatBounds();
+      routes.forEach(route => {
+        const geom = routeGeomRef.current.get(route.id);
+        if (geom) {
+          geom.forEach(coord => bounds.extend(coord));
+        } else {
+          route.routeStops.forEach(rs => bounds.extend([rs.stop.longitude, rs.stop.latitude]));
+        }
+      });
+      
+      if (!bounds.isEmpty()) {
+        map.current.fitBounds(bounds, { padding: 80, duration: 1500 });
+      }
+    } else if (selectedBusId) {
+      const marker = busMarkersRef.current.get(selectedBusId);
+      if (marker) {
+        const coords = marker.getLngLat();
+        map.current.flyTo({
+          center: coords,
+          zoom: 16,
+          duration: 2000,
+          essential: true
+        });
+      }
+    }
+  }, [mapLoaded, fitToRoute, selectedBusId, routes]);
 
   return (
     <div className="relative w-full h-full">

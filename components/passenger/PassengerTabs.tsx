@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useTransition } from "react";
+import { useState, useEffect, useCallback, useTransition } from "react";
 import dynamic from "next/dynamic";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
@@ -10,9 +10,10 @@ import { Input } from "@/components/ui/input";
 import ChatInterface from "@/components/chat/ChatInterface";
 import {
   MapPin, Clock, Star, MessageSquare, Bus, Search,
-  TrendingUp, Navigation, Gauge, Heart, HeartOff
+  TrendingUp, Navigation, Gauge, Heart, HeartOff, SearchCheck
 } from "lucide-react";
 import { toast } from "sonner";
+import BusFinder from "@/components/passenger/BusFinder";
 
 const TrackingMap = dynamic(() => import("@/components/map/TrackingMap"), {
   ssr: false,
@@ -79,11 +80,52 @@ export default function PassengerTabs({
   activeRoutes,
   favoriteRouteIds: initialFavorites,
 }: Props) {
+  const [activeTab, setActiveTab] = useState("map");
+  const [selectedBusId, setSelectedBusId] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<Set<string>>(new Set(initialFavorites));
   const [etas, setEtas] = useState<ETA[]>([]);
   const [etaLoading, setEtaLoading] = useState(false);
+  const [fromStop, setFromStop] = useState("");
+  const [toStop, setToStop] = useState("");
+  const [date, setDate] = useState("Today");
   const [routeSearch, setRouteSearch] = useState("");
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [nearestStop, setNearestStop] = useState<string | null>(null);
   const [, startTransition] = useTransition();
+
+  const allStopsFlat = activeRoutes.flatMap((r) => r.routeStops.map((rs) => rs.stop));
+  const uniqueStops = Array.from(new Map(allStopsFlat.map(s => [s.id, s])).values());
+  const allStopNames = uniqueStops.map(s => s.name).sort();
+
+  // Helper to find nearest stop
+  const findNearestStop = useCallback((lat: number, lng: number) => {
+    let minD = Infinity;
+    let closest = null;
+    uniqueStops.forEach(s => {
+      const d = Math.sqrt(Math.pow(s.latitude - lat, 2) + Math.pow(s.longitude - lng, 2));
+      if (d < minD) { minD = d; closest = s; }
+    });
+    return closest;
+  }, [uniqueStops]);
+
+  const handleLocate = () => {
+    if (!navigator.geolocation) return toast.error("Geolocation not supported");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        setUserLocation({ lat: latitude, lng: longitude });
+        const nearest = findNearestStop(latitude, longitude);
+        if (nearest) {
+          setNearestStop(nearest.name);
+          setFromStop(nearest.name);
+          toast.success(`Found nearest stop: ${nearest.name}`);
+          // Switch to find tab to show results from this stop
+          setActiveTab("find");
+        }
+      },
+      () => toast.error("Location access denied")
+    );
+  };
 
   // Load ETAs for all active buses when arrivals tab is visible
   async function loadETAs() {
@@ -151,17 +193,179 @@ export default function PassengerTabs({
   );
 
   return (
+    <div className="space-y-8">
+      <style jsx>{`
+        .search-container { perspective: 1000px; margin-bottom: 2rem; }
+        .search-bar-inner { transition: transform 0.3s ease, box-shadow 0.3s ease; }
+        .search-bar-inner:focus-within { transform: translateY(-2px); box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2); }
+        .pulse-red { animation: pulse 2s infinite; }
+        @keyframes pulse {
+          0% { box-shadow: 0 0 0 0 rgba(216, 78, 85, 0.4); }
+          70% { box-shadow: 0 0 0 10px rgba(216, 78, 85, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(216, 78, 85, 0); }
+        }
+      `}</style>
+
+      {/* ── Dashboard Search Bar (redBus style) ──────────────── */}
+      <div className="search-container relative">
+        <div 
+          className="flex flex-col md:flex-row items-stretch bg-card dark:bg-card/50 backdrop-blur-md rounded-2xl shadow-xl overflow-hidden border"
+          style={{ minHeight: "85px" }}
+        >
+          {/* FROM */}
+          <div className="flex-1 flex items-center px-6 py-4 border-r dark:border-white/5 relative group">
+            <Bus className="h-5 w-5 text-gray-400 mr-3" />
+            <div className="flex-1">
+              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-tight flex items-center gap-2">
+                From
+                <button 
+                  onClick={handleLocate}
+                  className="ml-auto flex items-center gap-1 text-[9px] text-blue-600 hover:text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded transition-all"
+                >
+                  <Navigation className="h-2.5 w-2.5" />
+                  Locate Me
+                </button>
+              </label>
+              <select 
+                value={fromStop}
+                onChange={(e) => setFromStop(e.target.value)}
+                className="w-full bg-transparent border-none outline-none text-gray-800 font-bold text-base appearance-none cursor-pointer"
+              >
+                <option value="">Select Origin</option>
+                {allStopNames.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* TO */}
+          <div className="flex-1 flex items-center px-6 py-4 border-r dark:border-white/5 relative group">
+            <div 
+              className="absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 bg-background border rounded-full p-2 shadow-md text-muted-foreground hover:text-red-500 transition-all cursor-pointer hidden md:flex items-center justify-center hover:scale-110 active:scale-95"
+              onClick={() => { const tmp = fromStop; setFromStop(toStop); setToStop(tmp); }}
+            >
+              <TrendingUp className="h-4 w-4 rotate-90" />
+            </div>
+            <Bus className="h-5 w-5 text-muted-foreground mr-3" />
+            <div className="flex-1">
+              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-tight">To</label>
+              <select 
+                value={toStop}
+                onChange={(e) => setToStop(e.target.value)}
+                className="w-full bg-transparent border-none outline-none text-gray-800 font-bold text-base appearance-none cursor-pointer"
+              >
+                <option value="">Select Destination</option>
+                {allStopNames.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* DATE */}
+          <div className="flex-1 flex items-center px-6 py-4 border-r dark:border-white/5 relative group">
+            <Clock className="h-5 w-5 text-muted-foreground mr-3" />
+            <div className="flex-1">
+              <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-tight">Date of Journey</label>
+              <div className="flex items-center gap-2">
+                <span className="text-foreground font-bold text-base">14 Apr, 2026</span>
+                <span className="text-xs text-emerald-600 font-medium">Tomorrow</span>
+              </div>
+            </div>
+            <div className="flex gap-1 ml-auto">
+              <button 
+                className={`text-[10px] px-2.5 py-1 rounded-full font-bold transition-all ${date === 'Today' ? 'bg-gray-100 text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}
+                onClick={() => setDate('Today')}
+              >Today</button>
+              <button 
+                className={`text-[10px] px-2.5 py-1 rounded-full font-bold transition-all ${date === 'Tomorrow' ? 'bg-red-50 text-red-600' : 'text-gray-400 hover:text-gray-600'}`}
+                onClick={() => setDate('Tomorrow')}
+              >Tomorrow</button>
+            </div>
+          </div>
+
+          {/* SEARCH BUTTON */}
+          <button 
+            onClick={() => setActiveTab("find")}
+            className="bg-[#D84E55] hover:bg-[#C13D44] text-white font-black px-12 py-4 transition-all flex items-center justify-center gap-3 uppercase tracking-widest text-sm shadow-[0_4px_20px_rgba(216,78,85,0.4)] active:scale-95"
+          >
+            <Search className="h-5 w-5 stroke-[3]" />
+            Search
+          </button>
+        </div>
+
+        {/* Floating Toggle (redBus style filler) */}
+        <div className="mt-4 flex items-center gap-6 text-xs font-semibold text-white/50">
+           <div className="flex items-center gap-2 cursor-pointer hover:text-white transition-colors">
+              <div className="w-4 h-4 rounded-sm border border-white/20 bg-white/5" />
+              <span>Booking for women</span>
+           </div>
+           <div className="flex items-center gap-2 cursor-pointer hover:text-white transition-colors">
+              <div className="w-4 h-4 rounded-sm border border-white/20 bg-white/5" />
+              <span>Primo (Premium)</span>
+           </div>
+           <div className="flex items-center gap-2 cursor-pointer hover:text-white transition-colors">
+              <div className="w-4 h-4 rounded-sm border border-white/20 bg-white/5" />
+              <span>AC Available</span>
+           </div>
+        </div>
+      </div>
+
+      {/* ── Proactive Location Section ──────────────── */}
+      {userLocation && nearestStop && (
+        <div className="animate-in fade-in slide-in-from-top-4 duration-500">
+          <div className="p-5 rounded-2xl bg-gradient-to-r from-blue-600/10 to-indigo-600/10 border border-blue-500/20 shadow-sm backdrop-blur-sm">
+            <div className="flex items-center justify-between mb-4">
+               <div>
+                  <h4 className="text-sm font-bold text-blue-600 flex items-center gap-2">
+                    <Navigation className="h-4 w-4 animate-pulse" />
+                    Buses arriving near you
+                  </h4>
+                  <p className="text-xs text-muted-foreground mt-0.5">Based on your proximity to <span className="font-bold text-foreground">{nearestStop}</span></p>
+               </div>
+               <button onClick={() => { setUserLocation(null); setNearestStop(null); setFromStop(""); }} className="text-[10px] font-bold text-muted-foreground hover:text-foreground">Dismiss</button>
+            </div>
+            
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+               {activeRoutes
+                 .filter(r => r.routeStops.some(rs => rs.stop.name === nearestStop))
+                 .slice(0, 3)
+                 .map(route => {
+                    const buses = activeBuses.filter(b => b.route?.id === route.id);
+                    return (
+                       <div key={route.id} className="p-3 bg-white rounded-xl border border-blue-100 flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-[10px]" style={{ background: route.color }}>{route.number}</div>
+                          <div className="flex-1 min-w-0">
+                             <p className="text-xs font-bold truncate text-gray-800">{route.name}</p>
+                             <p className="text-[10px] text-emerald-600 font-medium">{buses.length > 0 ? "LIVE" : "Next: 4:30 AM"}</p>
+                          </div>
+                          <button 
+                            onClick={() => { setFromStop(nearestStop); setActiveTab("find"); }}
+                            className="bg-blue-600 text-white text-[10px] font-black px-3 py-1.5 rounded-lg"
+                          >
+                            Track
+                          </button>
+                       </div>
+                    );
+                 })}
+            </div>
+          </div>
+        </div>
+      )}
+
     <Tabs
-      defaultValue="map"
-      className="space-y-4"
+      value={activeTab}
       onValueChange={(v) => {
+        setActiveTab(v);
         if (v === "arrivals") startTransition(() => { loadETAs(); });
       }}
+      className="space-y-4"
     >
-      <TabsList className="grid grid-cols-4 w-full max-w-lg h-10">
+      <TabsList className="grid grid-cols-5 w-full max-w-xl h-10">
         <TabsTrigger value="map" className="gap-1.5 text-xs sm:text-sm">
           <MapPin className="h-3.5 w-3.5" />
           <span className="hidden sm:inline">Map</span>
+        </TabsTrigger>
+        <TabsTrigger value="find" className="gap-1.5 text-xs sm:text-sm">
+          <SearchCheck className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">Find Bus</span>
         </TabsTrigger>
         <TabsTrigger value="arrivals" className="gap-1.5 text-xs sm:text-sm">
           <Clock className="h-3.5 w-3.5" />
@@ -177,38 +381,66 @@ export default function PassengerTabs({
         </TabsTrigger>
       </TabsList>
 
+      {/* ── Find My Bus ─────────────────────────────── */}
+      <TabsContent value="find">
+        <BusFinder 
+          activeRoutes={activeRoutes} 
+          activeBuses={activeBuses} 
+          externalFrom={fromStop}
+          externalTo={toStop}
+          onTrackOnMap={(busId) => {
+            setSelectedBusId(busId);
+            setActiveTab("map");
+          }}
+        />
+      </TabsContent>
+
       {/* ── Live Map ───────────────────────────────── */}
       <TabsContent value="map" className="space-y-4">
         <div className="h-[calc(100vh-340px)] min-h-96 rounded-xl overflow-hidden border shadow-sm">
-          <TrackingMap routes={activeRoutes} initialBuses={initialBuses} />
+          <TrackingMap 
+            routes={activeRoutes} 
+            initialBuses={initialBuses} 
+            selectedBusId={selectedBusId}
+            onBusClick={(id) => setSelectedBusId(id)}
+          />
         </div>
 
         {activeBuses.length > 0 && (
           <div>
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+            <p className="text-[11px] font-bold uppercase tracking-widest mb-3" style={{ color: "#6B7280" }}>
               Active Buses
             </p>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {activeBuses.slice(0, 6).map((bus) => (
                 <div
                   key={bus.id}
-                  className="flex items-center gap-3 p-3 rounded-xl border bg-card hover:shadow-sm transition-all"
+                  className="flex items-center gap-3 p-3 rounded-xl transition-all hover:scale-[1.02] bg-card border shadow-md"
+                  style={{
+                    borderLeft: `3px solid ${bus.route?.color ?? "#6366F1"}`,
+                  }}
                 >
+                  {/* Badge */}
                   <div
-                    className="w-9 h-9 rounded-lg flex items-center justify-center text-white font-bold text-xs shrink-0"
-                    style={{ backgroundColor: bus.route?.color ?? "#3B82F6" }}
+                    className="shrink-0 w-11 h-11 rounded-lg flex items-center justify-center text-white font-bold text-[10px] leading-tight text-center"
+                    style={{ background: bus.route?.color ?? "#6366F1", boxShadow: `0 0 10px ${bus.route?.color ?? "#6366F1"}55` }}
                   >
                     {bus.number}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm truncate">{bus.route?.name ?? "Unassigned"}</p>
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <p className="font-semibold text-sm truncate" style={{ color: "#F9FAFB" }}>
+                      {bus.route?.name ?? "Unassigned"}
+                    </p>
+                    <div className="flex items-center gap-1 text-xs mt-0.5" style={{ color: "#9CA3AF" }}>
                       <Gauge className="h-3 w-3" />
                       {bus.location ? `${Math.round(bus.location.speed)} km/h` : "No GPS"}
                     </div>
                   </div>
-                  <div className="flex items-center gap-1 text-xs text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5 shrink-0">
-                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <div
+                    className="flex items-center gap-1.5 text-xs font-semibold shrink-0 px-2.5 py-1 rounded-full"
+                    style={{ background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.3)", color: "#22C55E" }}
+                  >
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#22C55E] animate-pulse" />
                     Live
                   </div>
                 </div>
@@ -294,30 +526,36 @@ export default function PassengerTabs({
             </div>
           )}
 
-          {/* All active buses summary when no ETA data */}
           {etas.length === 0 && activeBuses.length > 0 && (
             <div className="mt-4 space-y-2">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">All Buses</p>
+              <p className="text-[11px] font-bold uppercase tracking-widest mb-3" style={{ color: "#6B7280" }}>All Buses</p>
               {activeBuses.map((bus) => (
                 <div
                   key={bus.id}
-                  className="flex items-center gap-3 p-3.5 rounded-xl border bg-card"
+                  className="flex items-center gap-3 p-3.5 rounded-xl transition-all bg-card border"
+                  style={{
+                    borderLeft: `3px solid ${bus.route?.color ?? "#6366F1"}`,
+                  }}
                 >
                   <div
-                    className="w-9 h-9 rounded-lg flex items-center justify-center text-white font-bold text-xs shrink-0"
-                    style={{ backgroundColor: bus.route?.color ?? "#3B82F6" }}
+                    className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-xs shrink-0"
+                    style={{ background: bus.route?.color ?? "#6366F1", boxShadow: `0 0 10px ${bus.route?.color ?? "#6366F1"}55` }}
                   >
                     {bus.number}
                   </div>
                   <div className="flex-1">
-                    <p className="font-medium text-sm">{bus.route?.name ?? "Unknown Route"}</p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="font-semibold text-sm" style={{ color: "#F9FAFB" }}>{bus.route?.name ?? "Unknown Route"}</p>
+                    <p className="text-xs mt-0.5" style={{ color: "#9CA3AF" }}>
                       {bus.location ? `${Math.round(bus.location.speed)} km/h` : "Location unknown"}
                     </p>
                   </div>
-                  <Badge variant="outline" className="text-xs shrink-0 text-emerald-600 border-emerald-200">
+                  <div
+                    className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full"
+                    style={{ background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.3)", color: "#22C55E" }}
+                  >
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#22C55E] animate-pulse" />
                     Active
-                  </Badge>
+                  </div>
                 </div>
               ))}
             </div>
@@ -410,6 +648,7 @@ export default function PassengerTabs({
         </div>
       </TabsContent>
     </Tabs>
+    </div>
   );
 }
 

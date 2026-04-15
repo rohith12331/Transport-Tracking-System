@@ -15,6 +15,8 @@ export const metadata: Metadata = {
     "Live GPS bus tracking, AI-powered arrival predictions, and smart route optimization for small cities.",
 };
 
+import { ThemeProvider } from "@/components/theme-provider";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -22,9 +24,16 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={cn("antialiased", poppins.className)}>
-        {children}
-        <Toaster richColors position="top-right" />
+      <body className={cn("antialiased selection:bg-primary/30", poppins.className)}>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {children}
+          <Toaster richColors position="top-right" />
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -160,11 +160,14 @@ export const routeStops = pgTable("route_stops", {
 
 export const buses = pgTable("buses", {
   id: text("id").primaryKey(),
+  name: varchar("name", { length: 100 }),
   number: varchar("number", { length: 20 }).notNull().unique(),
   registrationNumber: varchar("registration_number", { length: 30 }),
   capacity: integer("capacity").notNull().default(40),
+  busType: varchar("bus_type", { length: 20 }).default("Non-AC"),
   currentRouteId: text("current_route_id").references(() => routes.id),
   driverId: text("driver_id").references(() => users.id),
+  manualDriverName: varchar("manual_driver_name", { length: 100 }),
   status: busStatusEnum("status").notNull().default("inactive"),
   imageUrl: text("image_url"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -187,6 +190,7 @@ export const busLocations = pgTable(
     heading: real("heading").notNull().default(0),
     currentStopIndex: integer("current_stop_index").default(0),
     nextStopId: text("next_stop_id").references(() => busStops.id),
+    isReverse: boolean("is_reverse").default(false),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
   (table) => [index("bus_locations_bus_id_idx").on(table.busId)]

@@ -10,6 +10,7 @@ import { db } from "@/lib/db";
 import { buses, routes as routesTable } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import TrackingMap from "@/components/map/MapWrapper";
+import { ModeToggle } from "@/components/mode-toggle";
 
 async function getPublicData() {
   try {
@@ -72,6 +73,7 @@ export default async function HomePage() {
             <Link href="#routes" className="hover:text-foreground transition-colors">Routes</Link>
           </nav>
           <div className="flex items-center gap-2">
+            <ModeToggle />
             <Link href="/sign-in">
               <Button variant="ghost" size="sm">Sign In</Button>
             </Link>
@@ -178,29 +180,29 @@ export default async function HomePage() {
                 icon: MapPin,
                 title: "Live Tracking",
                 desc: "Every bus on the map, updated every 5 seconds via GPS. Never wonder where your bus is.",
-                color: "text-blue-500",
-                bg: "bg-blue-500/10",
+                color: "text-emerald-500",
+                bg: "bg-emerald-500/10",
               },
               {
                 icon: Clock,
                 title: "Smart ETAs",
                 desc: "AI-powered arrival predictions with confidence scores based on historical data.",
-                color: "text-violet-500",
-                bg: "bg-violet-500/10",
+                color: "text-amber-500",
+                bg: "bg-amber-500/10",
               },
               {
                 icon: Route,
                 title: "Route Optimizer",
                 desc: "Real-time traffic analysis helps drivers avoid delays and saves passengers time.",
-                color: "text-emerald-500",
-                bg: "bg-emerald-500/10",
+                color: "text-teal-500",
+                bg: "bg-teal-500/10",
               },
               {
                 icon: Bot,
                 title: "AI Assistant",
                 desc: "Ask anything about schedules, routes, and arrivals in natural language.",
-                color: "text-orange-500",
-                bg: "bg-orange-500/10",
+                color: "text-primary",
+                bg: "bg-primary/10",
               },
             ].map(({ icon: Icon, title, desc, color, bg }) => (
               <div
@@ -231,17 +233,17 @@ export default async function HomePage() {
                 icon: Navigation,
                 role: "Drivers",
                 points: ["Navigation with ETAs", "Route recommendations", "Report incidents", "Live passenger count"],
-                color: "border-blue-200 bg-blue-50 dark:bg-blue-950/20",
-                iconColor: "text-blue-600",
-                iconBg: "bg-blue-100 dark:bg-blue-900/40",
+                color: "border-teal-200 bg-teal-50 dark:bg-teal-950/20",
+                iconColor: "text-teal-600",
+                iconBg: "bg-teal-100 dark:bg-teal-900/40",
               },
               {
                 icon: Shield,
                 role: "Administrators",
                 points: ["Fleet management", "Live system overview", "Issue resolution", "GPS simulation"],
-                color: "border-purple-200 bg-purple-50 dark:bg-purple-950/20",
-                iconColor: "text-purple-600",
-                iconBg: "bg-purple-100 dark:bg-purple-900/40",
+                color: "border-amber-200 bg-amber-50 dark:bg-amber-950/20",
+                iconColor: "text-amber-600",
+                iconBg: "bg-amber-100 dark:bg-amber-900/40",
               },
             ].map(({ icon: Icon, role, points, color, iconColor, iconBg }) => (
               <div key={role} className={`rounded-2xl border p-6 ${color}`}>
@@ -318,10 +320,10 @@ export default async function HomePage() {
       )}
 
       {/* ── CTA ────────────────────────────────────── */}
-      <section className="py-20 bg-primary relative overflow-hidden">
-        <div className="absolute inset-0 bg-linear-to-r from-primary via-primary to-primary/80" />
-        <div className="absolute top-0 right-0 w-150 h-75 bg-white/5 rounded-full blur-3xl" />
-        <div className="relative container mx-auto px-4 text-center space-y-6">
+      <section className="py-24 bg-primary relative overflow-hidden">
+        <div className="absolute inset-0 bg-linear-to-br from-primary via-secondary to-primary/80" />
+        <div className="absolute top-0 right-0 w-150 h-75 bg-white/10 rounded-full blur-3xl" />
+        <div className="relative container mx-auto px-4 text-center space-y-8">
           <h2 className="text-4xl font-bold text-primary-foreground">
             Start tracking today
           </h2>

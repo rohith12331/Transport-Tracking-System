@@ -81,15 +81,18 @@ export default async function PassengerDashboard() {
       </div>
 
       {/* ── Quick Stats ──────────────────────────────── */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-3 gap-4">
         {[
-          { label: "Active Buses", value: activeBuses.length, icon: Bus, color: "text-blue-500", bg: "bg-blue-50 dark:bg-blue-950/30" },
-          { label: "Routes", value: activeRoutes.length, icon: null, color: "text-violet-500", bg: "bg-violet-50 dark:bg-violet-950/30" },
-          { label: "Saved Routes", value: userFavorites.length, icon: null, color: "text-amber-500", bg: "bg-amber-50 dark:bg-amber-950/30" },
-        ].map(({ label, value, color, bg }) => (
-          <div key={label} className={`rounded-xl border p-3 ${bg}`}>
-            <p className={`text-2xl font-bold tabular-nums ${color}`}>{value}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
+          { label: "Active Buses", value: activeBuses.length, icon: Bus, color: "text-cyan-400", bg: "bg-gradient-to-br from-cyan-500/10 to-transparent", border: "border-cyan-500/20" },
+          { label: "Routes", value: activeRoutes.length, icon: null, color: "text-purple-400", bg: "bg-gradient-to-br from-purple-500/10 to-transparent", border: "border-purple-500/20" },
+          { label: "Saved Routes", value: userFavorites.length, icon: null, color: "text-rose-400", bg: "bg-gradient-to-br from-rose-500/10 to-transparent", border: "border-rose-500/20" },
+        ].map(({ label, value, color, bg, border }) => (
+          <div key={label} className={`group relative overflow-hidden rounded-2xl border ${border} ${bg} p-5 transition-all hover:bg-opacity-50 hover:shadow-lg hover:shadow-${color.split('-')[1]}-500/10`}>
+            <div className="absolute inset-0 bg-white/5 opacity-0 backdrop-blur-3xl transition-opacity group-hover:opacity-100" />
+            <div className="relative z-10">
+              <p className={`text-4xl font-extrabold tabular-nums tracking-tight ${color} drop-shadow-md`}>{value}</p>
+              <p className="text-sm font-medium text-white/70 mt-1 uppercase tracking-wider">{label}</p>
+            </div>
           </div>
         ))}
       </div>

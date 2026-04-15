@@ -24,8 +24,9 @@ export interface ETAPrediction {
   stopId: string;
   stopName: string;
   minutesAway: number;
-  predictedArrival: Date;
-  confidence: number; // 0–100
+  arrivalTime: string;
+  confidence: number;
+  isPassed?: boolean;
 }
 
 /**
@@ -38,8 +39,9 @@ export async function calculateETAs(params: {
   currentLng: number;
   currentSpeed: number; // km/h
   currentStopIndex: number;
+  isReverse?: boolean;
 }): Promise<ETAPrediction[]> {
-  const { busId, routeId, currentLat, currentLng, currentSpeed, currentStopIndex } = params;
+  const { busId, routeId, currentLat, currentLng, currentSpeed, currentStopIndex, isReverse = false } = params;
 
   // Get remaining stops in order
   const stops = await db.query.routeStops.findMany({
@@ -48,8 +50,10 @@ export async function calculateETAs(params: {
     orderBy: (rs, { asc }) => [asc(rs.stopOrder)],
   });
 
-  const remainingStops = stops.filter((rs) => rs.stopOrder > currentStopIndex);
-  if (remainingStops.length === 0) return [];
+  // Track all stops from starting to ending
+  const allStops = stops.sort((a, b) => (isReverse ? b.stopOrder - a.stopOrder : a.stopOrder - b.stopOrder));
+  
+  if (allStops.length === 0) return [];
 
   const now = new Date();
   const hour = now.getHours();
@@ -62,8 +66,22 @@ export async function calculateETAs(params: {
   let prevLat = currentLat;
   let prevLng = currentLng;
 
-  for (const rs of remainingStops) {
+  for (const rs of allStops) {
     const stop = rs.stop;
+    const isPassed = isReverse ? rs.stopOrder >= currentStopIndex : rs.stopOrder <= currentStopIndex;
+    
+    if (isPassed) {
+       predictions.push({
+        stopId: stop.id,
+        stopName: stop.name,
+        minutesAway: 0,
+        arrivalTime: now.toISOString(),
+        confidence: 100,
+        isPassed: true
+      } as any);
+      continue;
+    }
+
     const distance = haversineDistance(prevLat, prevLng, stop.latitude, stop.longitude);
 
     // Travel time at current speed
@@ -107,7 +125,7 @@ export async function calculateETAs(params: {
       stopId: stop.id,
       stopName: stop.name,
       minutesAway: Math.round(accumulatedMinutes),
-      predictedArrival,
+      arrivalTime: predictedArrival.toISOString(),
       confidence,
     });
 

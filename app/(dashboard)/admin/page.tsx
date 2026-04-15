@@ -18,7 +18,14 @@ import TrackingMap from "@/components/map/MapWrapper";
 import CreateBusDialog from "@/components/admin/CreateBusDialog";
 import CreateRouteDialog from "@/components/admin/CreateRouteDialog";
 import CreateStopDialog from "@/components/admin/CreateStopDialog";
+import AssignStopsDialog from "@/components/admin/AssignStopsDialog";
+import EditBusDialog from "@/components/admin/EditBusDialog";
+import EditRouteDialog from "@/components/admin/EditRouteDialog";
 import ResolveIssueButton from "@/components/admin/ResolveIssueButton";
+import BookingSchedulerBar from "@/components/admin/BookingSchedulerBar";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function AdminDashboard() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -59,7 +66,7 @@ export default async function AdminDashboard() {
       busId: b.id,
       busNumber: b.number,
       routeId: b.currentRouteId ?? "",
-      routeColor: b.route?.color ?? "#3B82F6",
+      routeColor: b.route?.color ?? "#10B981",
       latitude: b.location!.latitude,
       longitude: b.location!.longitude,
       speed: b.location!.speed,
@@ -72,59 +79,59 @@ export default async function AdminDashboard() {
       value: activeBuses.length,
       sub: `${maintenanceBuses.length} in maintenance`,
       icon: Bus,
-      color: "text-blue-600",
-      bg: "bg-blue-50",
-      border: "border-blue-100",
+      color: "text-cyan-400",
+      bg: "bg-gradient-to-br from-cyan-500/10 to-transparent",
+      border: "border-cyan-500/20",
     },
     {
       title: "Routes",
       value: activeRoutesCount,
       sub: `${activeRoutes.length} total`,
       icon: Route,
-      color: "text-emerald-600",
-      bg: "bg-emerald-50",
-      border: "border-emerald-100",
+      color: "text-emerald-400",
+      bg: "bg-gradient-to-br from-emerald-500/10 to-transparent",
+      border: "border-emerald-500/20",
     },
     {
       title: "Stops",
       value: allStops.length,
       sub: "registered stops",
       icon: MapPin,
-      color: "text-violet-600",
-      bg: "bg-violet-50",
-      border: "border-violet-100",
+      color: "text-purple-400",
+      bg: "bg-gradient-to-br from-purple-500/10 to-transparent",
+      border: "border-purple-500/20",
     },
     {
       title: "Users",
       value: allUsers.length,
       sub: `${driverCount} drivers · ${passengerCount} passengers`,
       icon: Users,
-      color: "text-orange-600",
-      bg: "bg-orange-50",
-      border: "border-orange-100",
+      color: "text-amber-500",
+      bg: "bg-gradient-to-br from-amber-500/10 to-transparent",
+      border: "border-amber-500/20",
     },
     {
       title: "Open Issues",
       value: openIssues.length,
       sub: openIssues.length === 0 ? "All clear!" : "Need attention",
       icon: AlertTriangle,
-      color: openIssues.length > 0 ? "text-red-600" : "text-muted-foreground",
-      bg: openIssues.length > 0 ? "bg-red-50" : "bg-muted/30",
-      border: openIssues.length > 0 ? "border-red-100" : "border-border",
+      color: openIssues.length > 0 ? "text-rose-400" : "text-white/40",
+      bg: openIssues.length > 0 ? "bg-gradient-to-br from-rose-500/20 to-transparent" : "bg-white/5",
+      border: openIssues.length > 0 ? "border-rose-500/30" : "border-white/10",
     },
   ];
 
   const priorityConfig: Record<string, string> = {
-    low: "text-slate-600 bg-slate-100 border-slate-300",
-    medium: "text-amber-600 bg-amber-50 border-amber-300",
-    high: "text-orange-600 bg-orange-50 border-orange-300",
-    critical: "text-red-600 bg-red-50 border-red-300",
+    low: "text-slate-300 bg-slate-500/20 border-slate-500/30",
+    medium: "text-amber-300 bg-amber-500/20 border-amber-500/30",
+    high: "text-orange-400 bg-orange-500/20 border-orange-500/30",
+    critical: "text-rose-400 bg-rose-500/20 border-rose-500/30",
   };
 
   const roleColors: Record<string, string> = {
-    admin: "text-purple-600 bg-purple-50 border-purple-200",
-    driver: "text-blue-600 bg-blue-50 border-blue-200",
-    passenger: "text-emerald-600 bg-emerald-50 border-emerald-200",
+    admin: "text-amber-400 bg-amber-500/10 border-amber-500/20",
+    driver: "text-teal-400 bg-teal-500/10 border-teal-500/20",
+    passenger: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
   };
 
   return (
@@ -132,35 +139,34 @@ export default async function AdminDashboard() {
       {/* ── Header ───────────────────────────────── */}
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Admin Dashboard</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">System overview and management</p>
+          <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-foreground to-foreground/60 bg-clip-text text-transparent">Admin Dashboard</h1>
+          <p className="text-muted-foreground text-sm mt-1">System overview and management</p>
         </div>
-        <div className="flex items-center gap-1.5 bg-emerald-500/10 text-emerald-600 border border-emerald-200 rounded-full px-3 py-1.5 text-xs font-medium">
-          <Activity className="h-3.5 w-3.5" />
+        <div className="flex items-center gap-2 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.15)] rounded-full px-4 py-2 text-xs font-semibold backdrop-blur-md">
+          <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
           System Online
         </div>
       </div>
 
-      {/* ── Stats Grid ───────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        {stats.map(({ title, value, sub, icon: Icon, color, bg, border }) => (
-          <div key={title} className={`rounded-xl border ${border} ${bg} p-4`}>
-            <div className="flex items-start justify-between mb-2">
-              <p className="text-xs font-medium text-muted-foreground">{title}</p>
+      {/* ── Global KPI Stats Grid ───────────────────────────── */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+        {stats.map(({ title, value, sub, icon: Icon, color }) => (
+          <div key={title} className="premium-card p-5 group flex flex-col justify-between">
+            <div className="flex items-start justify-between mb-3">
+              <p className="text-[11px] font-bold uppercase tracking-widest text-[#9CA3AF]">{title}</p>
               <Icon className={`h-4 w-4 ${color}`} />
             </div>
-            <p className="text-2xl font-bold tabular-nums">{value}</p>
-            <p className="text-xs text-muted-foreground mt-0.5 truncate">{sub}</p>
+            <div>
+              <p className={`text-4xl font-black tabular-nums tracking-tighter ${color} mb-1`}>{value}</p>
+              <p className="text-[11px] text-[#6B7280] truncate font-semibold uppercase tracking-wider">{sub}</p>
+            </div>
           </div>
         ))}
       </div>
 
-      {/* ── GPS Simulator ────────────────────────── */}
-      <SimulatorControl busIds={activeBuses.map((b) => b.id)} />
-
-      {/* ── Tabs ─────────────────────────────────── */}
-      <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList className="flex flex-wrap h-auto gap-1 p-1">
+      {/* ── Tabs (Now Main Hierarchy) ──────────────── */}
+      <Tabs defaultValue="overview" className="space-y-6 w-full">
+        <TabsList className="flex flex-wrap h-auto gap-1 p-1 mb-2">
           <TabsTrigger value="overview" className="text-xs gap-1.5">
             <TrendingUp className="h-3.5 w-3.5" />Overview
           </TabsTrigger>
@@ -184,62 +190,77 @@ export default async function AdminDashboard() {
           </TabsTrigger>
         </TabsList>
 
-        {/* Overview / Live Map */}
-        <TabsContent value="overview">
-          <div className="space-y-4">
-            <div className="h-[calc(100vh-400px)] min-h-96 rounded-xl overflow-hidden border shadow-sm">
+        {/* Overview / Live Map / Dashboard Widgets */}
+        <TabsContent value="overview" className="space-y-6">
+          
+          {/* ── Travel Booking Style Assignment Bar ─── */}
+          <div className="w-full relative z-20">
+            <BookingSchedulerBar />
+          </div>
+
+          {/* ── GPS Simulator ────────────────────────── */}
+          <SimulatorControl busIds={activeBuses.map((b) => b.id)} />
+
+          {/* ── Two-Column Layout for Map and Info ── */}
+          <div className="grid lg:grid-cols-4 gap-6">
+            {/* Map Area */}
+            <div className="lg:col-span-3 h-[calc(100vh-350px)] min-h-[500px] premium-card overflow-hidden relative z-0">
               <TrackingMap routes={activeRoutes as any} initialBuses={initialBuses} />
             </div>
-            <div className="grid md:grid-cols-3 gap-4">
-              <Card>
+            
+            {/* Right Side Widgets */}
+            <div className="space-y-6 flex flex-col justify-between">
+              <Card className="flex-1">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Fleet Status</CardTitle>
+                  <CardTitle className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Fleet Status</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-2.5">
+                <CardContent className="space-y-4 pt-2">
                   {[
                     { label: "Active", count: activeBuses.length, dot: "bg-emerald-500" },
                     { label: "Maintenance", count: maintenanceBuses.length, dot: "bg-amber-500" },
-                    { label: "Inactive", count: allBuses.length - activeBuses.length - maintenanceBuses.length, dot: "bg-slate-300" },
+                    { label: "Inactive", count: allBuses.length - activeBuses.length - maintenanceBuses.length, dot: "bg-slate-500" },
                   ].map(({ label, count, dot }) => (
-                    <div key={label} className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full shrink-0 ${dot}`} />
-                      <span className="text-sm flex-1">{label}</span>
-                      <span className="text-sm font-semibold tabular-nums">{count}</span>
+                    <div key={label} className="flex items-center gap-3 border-b border-white/5 pb-2 last:border-0 last:pb-0">
+                      <div className={`w-2.5 h-2.5 rounded-full shrink-0 shadow-[0_0_10px_currentColor] ${dot} text-${dot.split('-')[1]}-500`} />
+                      <span className="text-sm flex-1 font-medium">{label}</span>
+                      <span className="text-lg font-bold tabular-nums">{count}</span>
                     </div>
                   ))}
                 </CardContent>
               </Card>
-              <Card>
+
+              <Card className="flex-1">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">User Breakdown</CardTitle>
+                  <CardTitle className="text-xs font-bold text-muted-foreground uppercase tracking-widest">User Breakdown</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-2.5">
+                <CardContent className="space-y-4 pt-2">
                   {[
                     { label: "Passengers", count: passengerCount, dot: "bg-emerald-500" },
-                    { label: "Drivers", count: driverCount, dot: "bg-blue-500" },
-                    { label: "Admins", count: allUsers.filter((u) => (u as any).role === "admin").length, dot: "bg-purple-500" },
+                    { label: "Drivers", count: driverCount, dot: "bg-teal-500" },
+                    { label: "Admins", count: allUsers.filter((u) => (u as any).role === "admin").length, dot: "bg-amber-500" },
                   ].map(({ label, count, dot }) => (
-                    <div key={label} className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full shrink-0 ${dot}`} />
-                      <span className="text-sm flex-1">{label}</span>
-                      <span className="text-sm font-semibold tabular-nums">{count}</span>
+                    <div key={label} className="flex items-center gap-3 border-b border-white/5 pb-2 last:border-0 last:pb-0">
+                      <div className={`w-2.5 h-2.5 rounded-full shrink-0 shadow-[0_0_10px_currentColor] ${dot} text-${dot.split('-')[1]}-500`} />
+                      <span className="text-sm flex-1 font-medium">{label}</span>
+                      <span className="text-lg font-bold tabular-nums">{count}</span>
                     </div>
                   ))}
                 </CardContent>
               </Card>
-              <Card>
+
+              <Card className="flex-1">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Coverage</CardTitle>
+                  <CardTitle className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Coverage</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-2.5">
+                <CardContent className="space-y-4 pt-2">
                   {[
                     { label: "Total Stops", count: allStops.length },
                     { label: "Active Routes", count: activeRoutesCount },
                     { label: "Open Issues", count: openIssues.length },
                   ].map(({ label, count }) => (
-                    <div key={label} className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">{label}</span>
-                      <span className="text-sm font-semibold tabular-nums">{count}</span>
+                    <div key={label} className="flex items-center justify-between border-b border-white/5 pb-2 last:border-0 last:pb-0">
+                      <span className="text-sm font-medium">{label}</span>
+                      <span className="text-lg font-bold tabular-nums text-slate-300">{count}</span>
                     </div>
                   ))}
                 </CardContent>
@@ -273,7 +294,11 @@ export default async function AdminDashboard() {
                 <TableBody>
                   {allBuses.map((bus) => (
                     <TableRow key={bus.id}>
-                      <TableCell className="font-semibold">{bus.number}</TableCell>
+                      <TableCell>
+                        <div className="bg-muted border px-2.5 py-1 border-l-2 border-l-emerald-500 rounded-md text-xs font-bold tracking-wider w-fit">
+                          {bus.number}
+                        </div>
+                      </TableCell>
                       <TableCell>
                         {bus.route ? (
                           <div className="flex items-center gap-2">
@@ -285,7 +310,7 @@ export default async function AdminDashboard() {
                         )}
                       </TableCell>
                       <TableCell className="text-sm">
-                        {bus.driver?.name ?? <span className="text-muted-foreground">None</span>}
+                        {bus.driver?.name || bus.manualDriverName || <span className="text-muted-foreground">None</span>}
                       </TableCell>
                       <TableCell>
                         <Badge
@@ -305,9 +330,18 @@ export default async function AdminDashboard() {
                         {bus.location ? `${Math.round(bus.location.speed)} km/h` : "—"}
                       </TableCell>
                       <TableCell>
-                        <Button variant="ghost" size="icon" className="h-7 w-7">
-                          <Settings className="h-3.5 w-3.5" />
-                        </Button>
+                        <EditBusDialog
+                          bus={{
+                            id: bus.id,
+                            number: bus.number,
+                            status: bus.status,
+                            currentRouteId: bus.currentRouteId ?? null,
+                            manualDriverName: (bus as any).manualDriverName ?? null,
+                            capacity: bus.capacity,
+                            busType: (bus as any).busType ?? "Non-AC",
+                          }}
+                          routes={activeRoutes.map((r) => ({ id: r.id, name: r.name, color: r.color }))}
+                        />
                       </TableCell>
                     </TableRow>
                   ))}
@@ -333,7 +367,13 @@ export default async function AdminDashboard() {
                 <CardTitle>Routes</CardTitle>
                 <CardDescription>{activeRoutes.length} routes configured</CardDescription>
               </div>
-              <CreateRouteDialog />
+              <div className="flex items-center gap-2">
+                <AssignStopsDialog
+                  routes={activeRoutes.map((r) => ({ id: r.id, name: r.name, number: r.number, color: r.color }))}
+                  allStops={allStops.map((s) => ({ id: s.id, name: s.name }))}
+                />
+                <CreateRouteDialog />
+              </div>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
@@ -354,11 +394,14 @@ export default async function AdminDashboard() {
                     return (
                       <TableRow key={route.id}>
                         <TableCell>
-                          <div
-                            className="w-8 h-8 rounded-lg text-white text-xs font-bold flex items-center justify-center"
-                            style={{ backgroundColor: route.color }}
-                          >
-                            {route.number}
+                          <div className="flex items-center gap-2.5">
+                            <div 
+                              className="w-2.5 h-2.5 rounded-full shrink-0 shadow-[0_0_10px_currentColor]" 
+                              style={{ color: route.color, backgroundColor: route.color }} 
+                            />
+                            <div className="bg-muted border px-2.5 py-1 rounded-md text-xs font-bold tracking-wider">
+                              {route.number}
+                            </div>
                           </div>
                         </TableCell>
                         <TableCell className="font-medium">{route.name}</TableCell>
@@ -379,9 +422,22 @@ export default async function AdminDashboard() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Button variant="ghost" size="icon" className="h-7 w-7">
-                            <Settings className="h-3.5 w-3.5" />
-                          </Button>
+                          <EditRouteDialog
+                            route={{
+                              id: route.id,
+                              name: route.name,
+                              number: route.number,
+                              color: route.color,
+                              status: route.status,
+                              description: (route as any).description ?? null,
+                              routeStops: route.routeStops.map((rs) => ({
+                                id: rs.id,
+                                stopOrder: rs.stopOrder,
+                                stop: { id: rs.stop.id, name: rs.stop.name },
+                              })),
+                            }}
+                            allStops={allStops.map((s) => ({ id: s.id, name: s.name }))}
+                          />
                         </TableCell>
                       </TableRow>
                     );

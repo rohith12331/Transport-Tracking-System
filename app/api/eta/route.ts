@@ -17,17 +17,14 @@ export async function GET(req: NextRequest) {
         with: { location: true },
       });
 
-      if (!bus || !bus.location || !bus.currentRouteId) {
-        return NextResponse.json({ error: "Bus not found or not active" }, { status: 404 });
-      }
-
       const etas = await calculateETAs({
         busId,
         routeId: bus.currentRouteId,
-        currentLat: bus.location.latitude,
-        currentLng: bus.location.longitude,
-        currentSpeed: bus.location.speed,
-        currentStopIndex: bus.location.currentStopIndex ?? 0,
+        currentLat: bus.location?.latitude ?? 0, // 0 is handled by calculator fallback
+        currentLng: bus.location?.longitude ?? 0,
+        currentSpeed: bus.location?.speed ?? 0,
+        currentStopIndex: bus.location?.currentStopIndex ?? 0,
+        isReverse: bus.location?.isReverse ?? false,
       });
 
       return NextResponse.json(etas);
