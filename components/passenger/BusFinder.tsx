@@ -189,6 +189,15 @@ export default function BusFinder({ activeRoutes, activeBuses, externalFrom, ext
           const stops = [...route.routeStops].sort((a,b) => a.stopOrder - b.stopOrder);
           const firstBusSpd = buses[0]?.location?.speed ?? BASE_SPEED_KMH;
           const routeSched = buildSchedule(route.routeStops, firstBusSpd);
+          
+          if (routeSched.length === 0) {
+            return (
+              <div key={route.id} className="rounded-2xl border border-gray-700 bg-gray-900 p-5 opacity-50">
+                <div className="text-sm text-gray-500 italic">No stops configured for {route.name}</div>
+              </div>
+            );
+          }
+
           const sT = fmt(routeSched[0].scheduledMin);
           const eT = fmt(routeSched[routeSched.length - 1].scheduledMin);
           const dM = Math.round(routeSched[routeSched.length-1].scheduledMin - routeSched[0].scheduledMin);
