@@ -117,8 +117,9 @@ export async function simulateBus(busId: string): Promise<{ success: boolean; me
   const nextStop = stops[nextStopIndex].stop;
 
   // Current position (or start from current stop if no location)
-  const currentLat = bus.location?.latitude ?? currentStop.latitude;
-  const currentLng = bus.location?.longitude ?? currentStop.longitude;
+  const currentStopObj = stops[currentStopIndex].stop;
+  const currentLat = bus.location?.latitude ?? currentStopObj.latitude;
+  const currentLng = bus.location?.longitude ?? currentStopObj.longitude;
 
   const previousSpeed = bus.location?.speed ?? 0;
   const maxAllowedSpeed = 65 + Math.random() * 5; // Target range 65-70
