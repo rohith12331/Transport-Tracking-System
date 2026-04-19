@@ -138,37 +138,69 @@ export default function BusFinder({ activeRoutes, activeBuses, externalFrom, ext
   const getBusesForRoute = (id: string) => activeBuses.filter(b => b.route?.id === id);
 
   if (selectedBus && selectedRoute) {
-    const schedule = buildSchedule(selectedRoute.routeStops, busSpeedForSelected);
+    const route = selectedRoute;
+    const bus = selectedBus;
+    const schedule = buildSchedule(route.routeStops, busSpeedForSelected);
     const ci = currentStopIdx(schedule);
     const departed = ci >= 0;
     const delay = departed ? schedule[ci].delayMin : 0;
 
     return (
       <div className="space-y-4">
-        <button onClick={() => { setSelectedBus(null); setSelectedRoute(null); }} className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium border border-gray-700 text-gray-400">
+        <button 
+          onClick={() => { setSelectedBus(null); setSelectedRoute(null); }} 
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium border border-gray-700 text-gray-400 hover:bg-gray-800 transition-colors"
+        >
           <ArrowLeft className="h-3.5 w-3.5" /> Back
         </button>
-        <div className="p-4 rounded-xl border border-gray-700 bg-gray-900" style={{ borderLeft: `4px solid ${selectedRoute.color}` }}>
+        
+        <div className="p-4 rounded-xl border border-gray-700 bg-gray-900" style={{ borderLeft: `4px solid ${route.color}` }}>
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold" style={{ background: selectedRoute.color }}>{selectedBus.number}</div>
-            <div className="flex-1 font-bold text-white">{selectedRoute.name}</div>
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold" style={{ background: route.color }}>
+              {bus.number}
+            </div>
+            <div className="flex-1 font-bold text-white">{route.name}</div>
             <div className="flex items-center gap-2">
-              <button onClick={() => onTrackOnMap?.(selectedBus.id)} className="px-3 py-1 rounded-full text-xs font-bold border border-indigo-500/40 text-indigo-400 bg-indigo-500/10"><MapPin className="h-3.5 w-3.5 inline mr-1" />Map</button>
-              <div className="px-3 py-1 rounded-full text-xs font-bold border border-cyan-500/30 text-cyan-400 bg-cyan-500/10"><Gauge className="h-3.5 w-3.5 inline mr-1" />{Math.round(busSpeedForSelected)} km/h</div>
+              <button 
+                onClick={() => onTrackOnMap?.(bus.id)} 
+                className="px-3 py-1 rounded-full text-xs font-bold border border-indigo-500/40 text-indigo-400 bg-indigo-500/10 hover:bg-indigo-500/20"
+              >
+                <MapPin className="h-3.5 w-3.5 inline mr-1" />Map
+              </button>
+              <div className="px-3 py-1 rounded-full text-xs font-bold border border-cyan-500/30 text-cyan-400 bg-cyan-500/10">
+                <Gauge className="h-3.5 w-3.5 inline mr-1" />{Math.round(busSpeedForSelected)} km/h
+              </div>
             </div>
           </div>
         </div>
+
         <div className="rounded-xl border border-gray-700 bg-gray-900 overflow-hidden p-5 space-y-4">
+          <div className="flex justify-between px-10 text-[10px] uppercase font-bold text-gray-500 mb-2">
+            <span>Stop Name</span>
+            <span>Scheduled</span>
+            <span>Est. Arrival</span>
+          </div>
           {schedule.map((s, i) => (
             <div key={s.stop.id} className="flex gap-4">
               <div className="flex flex-col items-center w-6">
-                <div className="w-4 h-4 rounded-full border-2" style={{ background: i === ci ? selectedRoute.color : (i < ci ? "#374151" : "transparent"), borderColor: i <= ci ? selectedRoute.color : "#374151" }} />
+                <div 
+                  className="w-4 h-4 rounded-full border-2 transition-colors" 
+                  style={{ 
+                    background: i === ci ? route.color : (i < ci ? "#374151" : "transparent"), 
+                    borderColor: i <= ci ? route.color : "#374151" 
+                  }} 
+                />
                 {i < schedule.length - 1 && <div className="w-0.5 flex-1 bg-gray-700" />}
               </div>
-              <div className="flex-1 pb-4 flex justify-between text-sm">
-                <div className={i === ci ? "text-white font-bold" : "text-gray-400"}>{s.stop.name}</div>
-                <div className="text-gray-500 font-mono">{fmt(s.scheduledMin)}</div>
-                <div className="font-mono text-white">{fmt(s.actualMin)}</div>
+              <div className="flex-1 pb-4 flex justify-between text-sm items-center">
+                <div className={`flex-1 ${i === ci ? "text-white font-bold" : "text-gray-400"}`}>
+                  {s.stop.name}
+                  {i === ci && <span className="ml-2 text-[10px] text-emerald-400 animate-pulse">● Currently Near</span>}
+                </div>
+                <div className="w-24 text-right text-gray-500 font-mono text-xs">{fmt(s.scheduledMin)}</div>
+                <div className={`w-24 text-right font-mono font-bold ${s.delayMin > 5 ? "text-amber-400" : "text-white"}`}>
+                  {fmt(s.actualMin)}
+                </div>
               </div>
             </div>
           ))}
